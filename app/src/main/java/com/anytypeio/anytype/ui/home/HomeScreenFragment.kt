@@ -21,7 +21,6 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.unit.dp
 import androidx.core.os.bundleOf
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -120,11 +119,7 @@ class HomeScreenFragment : BaseComposeFragment(),
                         onSpaceIconClicked = { vm.onSpaceSettingsClicked(space = SpaceId(space)) },
                         membersCount = view?.membersCount ?: 0,
                         name = view?.space?.name.orEmpty(),
-                        onBackButtonClicked = {
-                            vm.onBackClicked(
-                                isSpaceRoot = isSpaceRootScreen()
-                            )
-                        },
+                        onBackButtonClicked = vm::onBackClicked,
                         onSettingsClicked = { vm.onSpaceSettingsClicked(space = SpaceId(space)) }
                     )
                     PageWithWidgets(
@@ -161,9 +156,7 @@ class HomeScreenFragment : BaseComposeFragment(),
             }
 
             BackHandler {
-                vm.onBackClicked(
-                    isSpaceRoot = isSpaceRootScreen()
-                )
+                vm.onBackClicked()
             }
         }
     }
@@ -426,13 +419,6 @@ class HomeScreenFragment : BaseComposeFragment(),
                     Timber.e(it, "Error while opening vault from home screen")
                 }
             }
-            is Command.Exit -> {
-                runCatching {
-                    findNavController().popBackStack()
-                }.onFailure {
-                    Timber.e(it, "Error exiting home screen")
-                }
-            }
             is Command.ShowWidgetAutoCreatedToast -> {
                 toast(
                     msg = getString(
@@ -441,6 +427,18 @@ class HomeScreenFragment : BaseComposeFragment(),
                     ),
                     duration = Toast.LENGTH_LONG
                 )
+            }
+            is Command.HandleChatSpaceBackNavigation -> {
+                runCatching {
+                    // Back to ChatFragment if that was previous
+                    val result = findNavController().popBackStack(R.id.chatScreen, false)
+                    if (!result) {
+                        vm.proceedWithExitingToVault()
+                        findNavController().navigate(R.id.action_back_on_vault)
+                    }
+                }.onFailure {
+                    Timber.e(it, "Error while handling home screen back navigation")
+                }
             }
         }
     }
@@ -583,9 +581,4 @@ class HomeScreenFragment : BaseComposeFragment(),
             SPACE_ID_KEY to space
         )
     }
-}
-
-fun Fragment.isSpaceRootScreen() : Boolean {
-    val previous = findNavController().previousBackStackEntry
-    return previous?.destination?.id == R.id.vaultScreen
 }

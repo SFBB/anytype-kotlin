@@ -10,6 +10,7 @@
     <string name="appearance">Görünüm</string>
     <string name="file_storage">Dosya depolama alanı</string>
     <string name="key">Kurtarma anahtarı</string>
+    <string name="login_key">Kurtarma anahtarı</string>
     <string name="clear_file_cache">Dosya önbelleğini temizle</string>
     <string name="debug_sync_report">Hata Ayıklama Senkronizasyon Raporu</string>
     <string name="debug">Hata ayıklama</string>
@@ -28,6 +29,8 @@
     <string name="dark">Karanlık</string>
     <string name="system">Sistem</string>
     <string name="settings">Ayarlar</string>
+    <string name="app_preferences">Uygulama Tercihleri</string>
+    <string name="vault_key">Kasa &amp; Anahtar</string>
     <string name="have_you_back_up_your_recovery_phrase">Anahtarınızı yedeklediniz mi?</string>
     <string name="you_will_need_to_sign_in">Kasana erişmek için bu bilgilere ihtiyacın olacak. Güvenli bir yerde tut. Eğer kaybedersen hesabına erişemezsin.</string>
     <string name="about_help_and_community">Yardım &amp; Topluluk</string>
@@ -113,6 +116,7 @@
     <string name="content_description_bookmark_logo">Yer imi logosu</string>
     <string name="content_description_file_icon">Dosya simgesi</string>
     <string name="content_description_modal_icon">Modal simgesi</string>
+    <string name="alert_icon_description">Uyarı simgesi</string>
     <string name="modal_tap_to_type">Yazmak için dokun</string>
     <string name="modal_gallery">Galeri</string>
     <string name="modal_kanban">Kanban</string>
@@ -376,6 +380,7 @@
     <string name="content_desc_back_button">Geri düğmesi</string>
     <string name="content_desc_share_button">Paylaş düğmesi</string>
     <string name="content_desc_home_button">Ana ekran düğmesi</string>
+    <string name="content_desc_chat_button">Sohbet butonu</string>
     <string name="content_desc_search_button">Arama düğmesi</string>
     <string name="content_desc_add_doc_button">Döküman ekle</string>
     <string name="unsupported_block">Desteklenmeyen blok</string>
@@ -853,13 +858,13 @@
     <string name="create_object_section_lists">Listeler</string>
     <string name="create_object_section_objects">Nesneler</string>
     <string name="edit">Düzenle</string>
-    <string name="unselect_all">Tüm seçimi kaldır</string>
+    <string name="unselect_all">Seçimi kaldır</string>
     <string name="sets">Setler</string>
     <string name="favorites">Favoriler</string>
     <string name="recent">Yakın zamanda düzenlendi</string>
     <string name="recently_opened">Yakın zamanda açıldı</string>
     <string name="bin">Çöp kutusu</string>
-    <string name="synced_files">Senkronize edilmiş dosyalar</string>
+    <string name="synced_files">Dosyaları temizle</string>
     <string name="log_in">Giriş yap</string>
     <string name="create_object_section_library">Anytype Kitaplığı</string>
     <string name="bin_empty_title">Çöp kutunuz boş.</string>
@@ -1003,7 +1008,7 @@
     <string name="onboarding_terms_and_policy_privacy">Gizlilik\u00A0Politika</string>
     <string name="onboarding_new_vault_button_text">Burada yeniyim</string>
     <string name="onboarding_enter_my_vault">Sonraki</string>
-    <string name="onboarding_have_key_button_text">Zaten bir anahtarım var</string>
+    <string name="onboarding_have_key_button_text">Anahtara zaten sahibim</string>
     <string name="onboarding_get_my_key_button_text">Anahtarımı getir</string>
     <string name="onboarding_invite_code_title">Davet kodunuzu girin</string>
     <string name="onboarding_invite_code_description">Eğer sahip değilseniz anytype.io adresine gidin\n ve bekleme listesine kaydolun.</string>
@@ -1112,7 +1117,20 @@
     <string name="date_type_older">Daha eski</string>
     <string name="dates_days_ago">%1$s gün önce</string>
     <string name="dates_days_from">Şu andan itibaren %1$s gün</string>
-    <string name="settings_use_yamux">Multiplex yedekleme kitaplığını kullanın</string>
+    <string name="number_days_from">gün sonra</string>
+    <string name="number_days_ago">gün önce</string>
+    <!-- Date filter quick options -->
+    <string name="dates_filter_exact_day">Tam tarih</string>
+    <string name="dates_filter_last_week">Geçen hafta</string>
+    <string name="dates_filter_current_week">Bu hafta</string>
+    <string name="dates_filter_next_week">Gelecek hafta</string>
+    <string name="dates_filter_last_month">Geçen ay</string>
+    <string name="dates_filter_current_month">Bu ay</string>
+    <string name="dates_filter_next_month">Gelecek ay</string>
+    <string name="dates_filter_last_year">Geçen yıl</string>
+    <string name="dates_filter_current_year">Bu yıl</string>
+    <string name="dates_filter_next_year">Gelecek yıl</string>
+    <string name="settings_use_yamux">QUIC kullan</string>
     <string name="settings_share_local_logs">Yerel günlükleri paylaş</string>
     <!--endregion-->
     <string name="error_kanban_view_not_supported">Kanban görünümü henüz mobil cihazlarda mevcut değil.\nVerilerinize erişmek için görünümü değiştirin (Ayarlar -&gt; Görünüm) veya yeni bir görünüm oluşturun.</string>
@@ -1274,8 +1292,11 @@
     <string name="multiplayer_cancel_join_request">Katılma talebini iptal et</string>
     <string name="multiplayer_cancel_join_request_msg">Tekrar katılma isteği göndermeniz gerekecek.</string>
     <string name="multiplayer_do_not_cancel_join_request">İptal etme</string>
-    <string name="multiplayer_error_invite_not_found">Davetiye mevcut değil. Lütfen cihazlarınızın senkronize olduğundan emin olun.</string>
+    <string name="multiplayer_error_invite_not_found_title">Bu alana erişim yok</string>
+    <string name="multiplayer_error_invalid_link_title">Bu alana erişim yok</string>
+    <string name="multiplayer_error_invite_not_found">Kullandığınız bağlantı çalışmıyor gibi görünüyor. Lütfen bağlantı sahibinden sizinle yeni bir tane paylaşmasını isteyin.</string>
     <string name="multiplayer_error_invite_bad_content">Davet bağlantısı ayrıştırılamadı. Formatta hatalar veya geçersiz veriler olabilir.</string>
+    <string name="multiplayer_error_space_deleted_title">Bu alana erişim yok</string>
     <string name="multiplayer_error_space_is_deleted">Alan artık paylaşılmıyor gibi görünüyor. Lütfen cihazlarınızın senkronize olduğundan emin olun.</string>
     <string name="multiplayer_error_limit_reached">Bu alan için sınıra ulaşıldı. Lütfen üyeliğinizi yükseltin veya yardım için destek ekibiyle iletişime geçin.</string>
     <string name="multiplayer_error_not_shareable">Alan artık paylaşılmıyor gibi görünüyor. Lütfen cihazlarınızın senkronize olduğundan emin olun.</string>
@@ -1496,6 +1517,9 @@ Lütfen ihtiyaçlarınızla ilgili özel ayrıntıları burada belirtin.</string
     <string name="error_login_select_vault_error">Kasa hatasını seçin.</string>
     <string name="error_login_account_deleted_error">Bu hesap silinmiştir. Başka bir hesap kullanmayı deneyin veya yeni bir hesap oluşturun.</string>
     <string name="error_login_account_need_update_error">Hesap bilgileri alınamadı. Lütfen Anytype\'ı en son sürüme güncelleyin.</string>
+    <string name="error_wallet_setup">Cüzdan kurulamıyor. Lütfen cihazınızın depolama alanını kontrol edin ve tekrar deneyin.</string>
+    <string name="error_network_error">Ağ hatası oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.</string>
+    <string name="error_offline_device">Cihazınız çevrimdışı görünüyor. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.</string>
     <string name="global_search_related_to">"Şununla ilgili: "</string>
     <string name="global_search_no_related_objects_found">İlgili nesne bulunamadı</string>
     <string name="sort_empty_values_desc">Boş değerleri göster</string>
@@ -1540,6 +1564,10 @@ Lütfen ihtiyaçlarınızla ilgili özel ayrıntıları burada belirtin.</string
     <string name="vault_my_spaces">Alanlarım</string>
     <string name="vault_unread_section_title">Okunmamış</string>
     <string name="vault_all_section_title">Hepsi</string>
+    <string name="vault_pinned_section_title">Sabitlendi</string>
+    <string name="vault_pin_space">Pin</string>
+    <string name="vault_unpin_space">Sabitlemeyi kaldır</string>
+    <string name="vault_max_pinned_limit_reached">%1$d sabitlenmiş alan sınırına ulaştınız</string>
     <string name="all_content_title_all_content">Tüm Nesneler</string>
     <string name="all_content_title_only_unlinked">Sadece bağlantısız</string>
     <string name="all_content_title_only_unlinked_description">Grafikteki diğer nesnelerle doğrudan bağlantısı veya geri bağlantısı olmayan bağlantısız nesneler.</string>
@@ -1560,6 +1588,7 @@ Lütfen ihtiyaçlarınızla ilgili özel ayrıntıları burada belirtin.</string
     <string name="all_content_sort_date_created">Oluşturulma tarihi</string>
     <string name="all_content_sort_date_used">Kullanılan son tarih</string>
     <string name="all_content_sort_name">İsim</string>
+    <string name="all_content_item_menu_open">Nesne olarak Aç</string>
     <string name="all_content">Tüm Nesneler</string>
     <string name="allContent_group_today">Bugün</string>
     <string name="allContent_group_yesterday">Dün</string>
@@ -1589,6 +1618,7 @@ Lütfen ihtiyaçlarınızla ilgili özel ayrıntıları burada belirtin.</string
     <string name="main_navigation_content_desc_back_button">Geri düğmesi</string>
     <string name="main_navigation_content_desc_members_button">Paylaş ve üyeler butonu</string>
     <string name="main_navigation_content_desc_home_button">Ana ekran düğmesi</string>
+    <string name="main_navigation_content_desc_chat_button">Sohbet butonu</string>
     <string name="main_navigation_content_desc_search_button">Nesneleri ara butonu</string>
     <string name="main_navigation_content_desc_create_button">Nesne oluştur butonu</string>
     <string name="chat">Sohbet</string>
@@ -1784,6 +1814,18 @@ Lütfen ihtiyaçlarınızla ilgili özel ayrıntıları burada belirtin.</string
     <string name="space_properties_screen_section_system_types">Sistem Özellikleri</string>
     <string name="space_properties_screen_menu_move_to_bin">Çöpe taşı</string>
     <string name="onboarding_error_while_creating_account_space_is_missing">Hesap oluşturulurken hata oluştu: alan eksik</string>
+    <!-- Account creation error messages -->
+    <string name="onboarding_error_network_error">Ağ hatası nedeniyle hesap oluşturulamadı. Lütfen bağlantınızı kontrol edin.</string>
+    <string name="onboarding_error_offline_device">Cihazınız çevrimdışı görünüyor. Lütfen bağlantınızı kontrol edin ve tekrar deneyin.</string>
+    <string name="onboarding_error_account_created_but_failed_to_start_node">Hesap oluşturuldu ancak düğüm başlatılamadı. Lütfen tekrar giriş yapmayı deneyin.</string>
+    <string name="onboarding_error_account_created_but_failed_to_set_name">Hesap oluşturuldu ancak isim ayarlanamadı. Ayarlarından daha sonra güncelleyebilirsiniz.</string>
+    <string name="onboarding_error_failed_to_stop_running_node">Çalışan düğüm durdurulamadı. Lütfen uygulamayı yeniden başlatın ve tekrar deneyin.</string>
+    <string name="onboarding_error_failed_to_write_config">Yapılandırma kaydedilemedi. Lütfen depolama izinlerini kontrol edin.</string>
+    <string name="onboarding_error_failed_to_create_local_repo">Yerel depo oluşturulamadı. Lütfen kullanılabilir depolama alanını kontrol edin.</string>
+    <string name="onboarding_error_account_creation_canceled">Hesap oluşturma iptal edildi.</string>
+    <string name="onboarding_error_config_file_not_found">Yapılandırma dosyası bulunamadı. Lütfen uygulamayı yeniden yükleyin.</string>
+    <string name="onboarding_error_config_file_invalid">Geçersiz yapılandırma dosyası. Lütfen uygulamayı yeniden yükleyin.</string>
+    <string name="onboarding_error_config_file_network_id_mismatch">Ağ yapılandırması uyuşmazlığı. Lütfen ağ ayarlarınızı kontrol edin.</string>
     <string name="onboarding_set_your_name_title">Adınızı Ekleyin</string>
     <string name="onboarding_soul_creation_description">Sadece bir şeyler paylaştığın kişiler tarafından görülür. Bu isimler için merkezi bir kayıt defteri yoktur.</string>
     <string name="onboarding_email_add_title">Gelişmelerden haberdar olun</string>
@@ -1797,11 +1839,12 @@ Lütfen ihtiyaçlarınızla ilgili özel ayrıntıları burada belirtin.</string
     <string name="notifications_modal_description">Alanlarınızda biri size mesaj attığında veya sizden bahsettiğinde anında bildirim alın.</string>
     <string name="notifications_modal_success_button">Bildirimleri etkinleştir</string>
     <string name="notifications_modal_cancel_button">Şimdi değil</string>
-    <string name="vault_create_chat">Sohbet</string>
+    <string name="vault_create_chat">Yeni Sohbet</string>
     <string name="vault_create_chat_description">Gerçek zamanlı görüşmeler için</string>
-    <string name="vault_create_space">Alan</string>
+    <string name="vault_create_space">Yeni Alan</string>
     <string name="vault_create_space_description">Düzenli içerik ve veriler için</string>
     <string name="vault_empty_state_text">Henüz alan yok</string>
+    <string name="vault_empty_search_state_text">Eşleşme bulunamadı</string>
     <string name="chat_new_messages_section_text">Yeni mesajlar</string>
     <string name="chat_box_camera">Kamera</string>
     <string name="chat_box_take_photo">Fotoğraf Çek</string>
@@ -1816,4 +1859,28 @@ Lütfen ihtiyaçlarınızla ilgili özel ayrıntıları burada belirtin.</string
     <string name="notifications_disable_short">Devre dışı bırak</string>
     <string name="space_notify_unmute">Susturmayı kaldır</string>
     <string name="space_notify_mute">Sustur</string>
+    <string name="vault_pinned_limit_message">%1$d sabitlenmiş alan mevcut sınırınızdır. Yeni bir favori eklemek için birini sabitlemekten kaldırın.</string>
+    <string name="vault_space_settings">Alan Ayarları</string>
+    <string name="notification_settings_title">Bildirimler</string>
+    <string name="notification_settings_disabled">Bildirimler devre dışı</string>
+    <string name="notification_settings_disabled_subtitle">Cihaz ayarlarınızda etkinleştirerek yeni mesajlarla ilgili bildirimler alın.</string>
+    <string name="notification_settings_button_open">Ayarlar\'ı Aç</string>
+    <string name="notification_settings_state_title">Mesaj Bildirimleri</string>
+    <string name="notification_settings_state_disabled">Devre dışı</string>
+    <string name="notification_settings_state_enabled">Etkinleştirilmiş</string>
+    <string name="content_desc_muted">Sessiz</string>
+    <string name="failed_to_load_image">Görüntü yüklenemedi</string>
+    <!-- Vault Screen - Join via QR -->
+    <string name="vault_join_via_qr">Karekod ile katıl</string>
+    <string name="vault_qr_scan_error_title">Karekod taranamadı</string>
+    <string name="vault_qr_scan_error_description">Görünür olduğundan emin olun ve tekrar deneyin.</string>
+    <string name="vault_qr_invalid_title">Geçersiz karekod</string>
+    <string name="vault_qr_invalid_description">Taranan karekod geçerli bir davetiyeyle eşleşmiyor. Lütfen kontrol edin ve tekrar deneyin.</string>
+    <string name="vault_qr_try_again">Tekrar deneyin</string>
+    <string name="camera_permission_required_title">Kamera izni gerekli</string>
+    <string name="camera_permission_rationale_message">Karekodları taramak için Anytype\'ın kameranıza erişmesi gerekir. Bu izin yalnızca karekodları taramak için kullanılır.</string>
+    <string name="camera_permission_settings_message">Karekodları taramak için cihaz ayarlarınızda kamera erişimine izin vermeniz gerekir.</string>
+    <string name="open_settings">Ayarlar\'ı Aç</string>
+    <string name="allow">İzin ver</string>
+    <string name="attachment_image">Ekli görüntü</string>
 </resources>

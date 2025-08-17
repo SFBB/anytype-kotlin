@@ -22,7 +22,6 @@ import com.anytypeio.anytype.core_models.primitives.SpaceId
 import com.anytypeio.anytype.core_models.syncStatus
 import com.anytypeio.anytype.core_ui.text.splitByMarks
 import com.anytypeio.anytype.core_utils.common.DefaultFileInfo
-import com.anytypeio.anytype.core_utils.tools.DEFAULT_URL_REGEX
 import com.anytypeio.anytype.domain.auth.interactor.GetAccount
 import com.anytypeio.anytype.domain.base.AppCoroutineDispatchers
 import com.anytypeio.anytype.domain.base.fold
@@ -57,12 +56,15 @@ import com.anytypeio.anytype.domain.page.CreateObject
 import com.anytypeio.anytype.feature_chats.BuildConfig
 import com.anytypeio.anytype.feature_chats.tools.ClearChatsTempFolder
 import com.anytypeio.anytype.feature_chats.tools.DummyMessageGenerator
+import com.anytypeio.anytype.feature_chats.tools.LinkDetector
+import com.anytypeio.anytype.feature_chats.tools.syncStatus
 import com.anytypeio.anytype.presentation.common.BaseViewModel
 import com.anytypeio.anytype.presentation.confgs.ChatConfig
 import com.anytypeio.anytype.presentation.home.OpenObjectNavigation
 import com.anytypeio.anytype.presentation.home.navigation
 import com.anytypeio.anytype.presentation.mapper.objectIcon
 import com.anytypeio.anytype.presentation.notifications.NotificationPermissionManager
+import com.anytypeio.anytype.presentation.notifications.NotificationStateCalculator
 import com.anytypeio.anytype.presentation.objects.ObjectIcon
 import com.anytypeio.anytype.presentation.objects.SpaceMemberIconView
 import com.anytypeio.anytype.presentation.search.GlobalSearchItemView
@@ -179,13 +181,15 @@ class ChatViewModel @Inject constructor(
                 .observe(
                     vmParams.space
                 ).map { view ->
+                    val isMuted = NotificationStateCalculator.calculateMutedState(view, notificationPermissionManager)
                     HeaderView.Default(
                         title = view.name.orEmpty(),
                         icon = view.spaceIcon(
                             builder = urlBuilder,
                             spaceGradientProvider = SpaceGradientProvider.Default
                         ),
-                        showIcon = true
+                        showIcon = true,
+                        isMuted = isMuted
                     )
                 }.collect {
                     header.value = it
@@ -346,7 +350,14 @@ class ChatViewModel @Inject constructor(
                             msg = content?.text.orEmpty(),
                             parts = content?.text
                                 .orEmpty()
-                                .splitByMarks(marks = content?.marks.orEmpty())
+                                .let { text ->
+                                    // Add detected links (URLs, emails, phones) to existing marks
+                                    val enhancedMarks = LinkDetector.addLinkMarksToText(
+                                        text = text,
+                                        existingMarks = content?.marks.orEmpty()
+                                    )
+                                    text.splitByMarks(marks = enhancedMarks)
+                                }
                                 .map { (part, styles) ->
                                     ChatView.Message.Content.Part(
                                         part = part,
@@ -360,6 +371,7 @@ class ChatViewModel @Inject constructor(
                         isUserAuthor = msg.creator == account,
                         shouldHideUsername = shouldHideUsername,
                         isEdited = msg.modifiedAt > msg.createdAt,
+                        isSynced = msg.synced,
                         reactions = msg.reactions
                             .toList()
                             .sortedByDescending { (emoji, ids) -> ids.size }
@@ -380,7 +392,10 @@ class ChatViewModel @Inject constructor(
                                         target = attachment.target,
                                         url = urlBuilder.large(path = attachment.target),
                                         name =  wrapper?.name.orEmpty(),
-                                        ext = wrapper?.fileExt.orEmpty()
+                                        ext = wrapper?.fileExt.orEmpty(),
+                                        status = wrapper
+                                            ?.syncStatus()
+                                            ?: ChatView.Message.Attachment.SyncStatus.Unknown
                                     )
                                 }
                                 else -> {
@@ -391,7 +406,8 @@ class ChatViewModel @Inject constructor(
                                                 target = attachment.target,
                                                 url = urlBuilder.large(path = attachment.target),
                                                 name = wrapper.name.orEmpty(),
-                                                ext = wrapper.fileExt.orEmpty()
+                                                ext = wrapper.fileExt.orEmpty(),
+                                                status = wrapper.syncStatus()
                                             )
                                         }
                                         ObjectType.Layout.VIDEO -> {
@@ -399,7 +415,8 @@ class ChatViewModel @Inject constructor(
                                                 target = attachment.target,
                                                 url = urlBuilder.large(path = attachment.target),
                                                 name = wrapper.name.orEmpty(),
-                                                ext = wrapper.fileExt.orEmpty()
+                                                ext = wrapper.fileExt.orEmpty(),
+                                                status = wrapper.syncStatus()
                                             )
                                         }
                                         ObjectType.Layout.BOOKMARK -> {
@@ -547,6 +564,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun getMentionedMembers(query: MentionPanelState.Query?): List<MentionPanelState.Member> {
+        Timber.d("getMentionedMembers, query: $query")
         val results = members.get().let { store ->
             when (store) {
                 is Store.Data -> {
@@ -554,7 +572,7 @@ class ChatViewModel @Inject constructor(
                         .filter { member -> member.permissions?.isAtLeastReader() == true }
                         .map { member ->
                             MentionPanelState.Member(
-                                member.id,
+                                id = member.id,
                                 name = member.name.orEmpty(),
                                 icon = SpaceMemberIconView.icon(
                                     obj = member,
@@ -584,28 +602,14 @@ class ChatViewModel @Inject constructor(
             Timber.d("DROID-2635 OnMessageSent, markup: $markup}")
         }
         viewModelScope.launch {
-            val urlRegex = Regex(DEFAULT_URL_REGEX)
-            val parsedUrls = buildList {
-                urlRegex.findAll(msg).forEach { match ->
-                    val range = match.range
-                    // Adjust the range to include the last character (inclusive end range)
-                    val adjustedRange = range.first..range.last + 1
-                    val url = match.value
-
-                    // Check if a LINK markup already exists in the same range
-                    if (markup.none { it.range == adjustedRange && it.type == Block.Content.Text.Mark.Type.LINK }) {
-                        add(
-                            Block.Content.Text.Mark(
-                                range = adjustedRange,
-                                type = Block.Content.Text.Mark.Type.LINK,
-                                param = url
-                            )
-                        )
-                    }
-                }
-            }
-
-            val normalizedMarkup = (markup + parsedUrls).sortedBy { it.range.first }
+            // Use LinkDetector to find all types of links (URLs, emails, phones)
+            val detectedLinkMarks = LinkDetector.addLinkMarksToText(
+                text = msg,
+                existingMarks = markup
+            )
+            
+            // The LinkDetector already handles deduplication, so we can use its result directly
+            val normalizedMarkup = detectedLinkMarks.sortedBy { it.range.first }
 
             var shouldClearChatTempFolder = false
 
@@ -824,7 +828,8 @@ class ChatViewModel @Inject constructor(
                                 id = mode.msg,
                                 text = msg.trim(),
                                 attachments = attachments,
-                                marks = normalizedMarkup
+                                marks = normalizedMarkup,
+                                synced = false
                             )
                         )
                     ).onSuccess {
@@ -1068,7 +1073,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onDeleteMessage(msg: ChatView.Message) {
-        Timber.d("onDeleteMessageClicked")
+        Timber.d("onDeleteMessageClicked msg: ${msg.id}")
         viewModelScope.launch {
             deleteChatMessage.async(
                 Command.ChatCommand.DeleteMessage(
@@ -1113,6 +1118,14 @@ class ChatViewModel @Inject constructor(
                                 // If url not found, open bookmark object instead of browsing.
                                 navigation.emit(wrapper.navigation())
                             }
+                        } else if (wrapper.layout == ObjectType.Layout.AUDIO) {
+                            val hash = urlBuilder.original(wrapper.id)
+                            commands.emit(
+                                ViewModelCommand.PlayAudio(
+                                    url = hash,
+                                    name = wrapper.name.orEmpty()
+                                )
+                            )
                         } else {
                             navigation.emit(wrapper.navigation())
                         }
@@ -1147,12 +1160,14 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onExitEditMessageMode() {
+        Timber.d("onExitEditMessageMode")
         viewModelScope.launch {
             chatBoxMode.value = ChatBoxMode.Default()
         }
     }
 
-    fun onBackButtonPressed(isSpaceRoot: Boolean) {
+    fun onBackButtonPressed() {
+        Timber.d("onBackButtonPressed")
         viewModelScope.launch {
             withContext(dispatchers.io) {
                 chatContainer.stop(chat = vmParams.ctx)
@@ -1166,25 +1181,25 @@ class ChatViewModel @Inject constructor(
                     Timber.d("DROID-2966 ObjectWatcher unwatched")
                 }
             }
-            if (isSpaceRoot) {
-                Timber.d("Root space screen. Releasing resources...")
-                proceedWithClearingSpaceBeforeExitingToVault()
-            }
+            proceedWithClearingSpaceBeforeExitingToVault()
             commands.emit(ViewModelCommand.Exit)
         }
     }
 
-    fun onSpaceNameClicked(isSpaceRoot: Boolean) {
-        onBackButtonPressed(isSpaceRoot = isSpaceRoot)
+    fun onSpaceNameClicked() {
+        Timber.d("onSpaceNameClicked")
+        onBackButtonPressed()
     }
 
     fun onSpaceIconClicked() {
+        Timber.d("onSpaceIconClicked")
         viewModelScope.launch {
             commands.emit(ViewModelCommand.OpenWidgets)
         }
     }
 
     fun onMediaPreview(url: String) {
+        Timber.d("onMediaPreview, url: $url")
         viewModelScope.launch {
             commands.emit(
                 ViewModelCommand.MediaPreview(url = url)
@@ -1193,6 +1208,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onSelectChatReaction(msg: Id) {
+        Timber.d("onSelectChatReaction, msg: $msg")
         viewModelScope.launch {
             commands.emit(
                 ViewModelCommand.SelectChatReaction(
@@ -1206,6 +1222,7 @@ class ChatViewModel @Inject constructor(
         msg: Id,
         emoji: String
     ) {
+        Timber.d("onViewChatReaction, msg: $msg, emoji: $emoji")
         viewModelScope.launch {
             commands.emit(
                 ViewModelCommand.ViewChatReaction(
@@ -1217,6 +1234,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onMemberIconClicked(member: Id?) {
+        Timber.d("onMemberIconClicked: $member")
         viewModelScope.launch {
             if (member != null) {
                 commands.emit(
@@ -1232,10 +1250,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onInviteModalDismissed() {
+        Timber.d("onInviteModalDismissed")
         inviteModalState.value = InviteModalState.Hidden
     }
 
     fun onGenerateInviteLinkClicked() {
+        Timber.d("onGenerateInviteLinkClicked")
         viewModelScope.launch {
             isGeneratingInviteLink.value = true
             proceedWithGeneratingInviteLink()
@@ -1385,6 +1405,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onMentionClicked(member: Id) {
+        Timber.d("onMentionClicked: $member")
         viewModelScope.launch {
             commands.emit(
                 ViewModelCommand.ViewMemberCard(
@@ -1584,6 +1605,10 @@ class ChatViewModel @Inject constructor(
     fun hideError() {
         errorState.value = UiErrorState.Hidden
     }
+    
+    fun onCameraPermissionDenied() {
+        errorState.value = UiErrorState.CameraPermissionDenied
+    }
 
     private fun proceedWithSpaceSubscription() {
         viewModelScope.launch {
@@ -1611,6 +1636,7 @@ class ChatViewModel @Inject constructor(
         data object OpenWidgets : ViewModelCommand()
         data class MediaPreview(val url: String) : ViewModelCommand()
         data class Browse(val url: String) : ViewModelCommand()
+        data class PlayAudio(val url: String, val name: String) : ViewModelCommand()
         data class SelectChatReaction(val msg: Id) : ViewModelCommand()
         data class ViewChatReaction(val msg: Id, val emoji: String) : ViewModelCommand()
         data class ViewMemberCard(val member: Id, val space: SpaceId) : ViewModelCommand()
@@ -1680,13 +1706,15 @@ class ChatViewModel @Inject constructor(
         data class Default(
             val icon: SpaceIconView,
             val title: String,
-            val showIcon: Boolean
+            val showIcon: Boolean,
+            val isMuted: Boolean = false
         ) : HeaderView()
     }
 
     sealed class UiErrorState {
         data object Hidden : UiErrorState()
         data class Show(val msg: String) : UiErrorState()
+        data object CameraPermissionDenied : UiErrorState()
     }
 
     sealed class Params {

@@ -30,6 +30,7 @@ import com.anytypeio.anytype.core_models.ext.EMPTY_STRING_VALUE
 import com.anytypeio.anytype.core_models.ext.process
 import com.anytypeio.anytype.core_models.isDataView
 import com.anytypeio.anytype.core_models.multiplayer.SpaceMemberPermissions
+import com.anytypeio.anytype.core_models.multiplayer.SpaceUxType
 import com.anytypeio.anytype.core_models.primitives.Space
 import com.anytypeio.anytype.core_models.primitives.SpaceId
 import com.anytypeio.anytype.core_models.primitives.TypeKey
@@ -102,6 +103,7 @@ import com.anytypeio.anytype.presentation.home.Command.ChangeWidgetType.Companio
 import com.anytypeio.anytype.presentation.navigation.DeepLinkToObjectDelegate
 import com.anytypeio.anytype.presentation.navigation.NavPanelState
 import com.anytypeio.anytype.presentation.navigation.NavigationViewModel
+import com.anytypeio.anytype.presentation.notifications.NotificationPermissionManager
 import com.anytypeio.anytype.presentation.navigation.leftButtonClickAnalytics
 import com.anytypeio.anytype.presentation.objects.getCreateObjectParams
 import com.anytypeio.anytype.presentation.search.Subscriptions
@@ -224,7 +226,6 @@ class HomeScreenViewModel(
     private val createBlock: CreateBlock,
     private val dateProvider: DateProvider,
     private val addObjectToCollection: AddObjectToCollection,
-    private val clearLastOpenedSpace: ClearLastOpenedSpace,
     private val clearLastOpenedObject: ClearLastOpenedObject,
     private val spaceBinWidgetContainer: SpaceBinWidgetContainer,
     private val featureToggles: FeatureToggles,
@@ -236,7 +237,8 @@ class HomeScreenViewModel(
     private val deleteSpace: DeleteSpace,
     private val spaceMembers: ActiveSpaceMemberSubscriptionContainer,
     private val setAsFavourite: SetObjectListIsFavorite,
-    private val chatPreviews: ChatPreviewContainer
+    private val chatPreviews: ChatPreviewContainer,
+    private val notificationPermissionManager: NotificationPermissionManager
 ) : NavigationViewModel<HomeScreenViewModel.Navigation>(),
     Reducer<ObjectView, Payload>,
     WidgetActiveViewStateHolder by widgetActiveViewStateHolder,
@@ -408,10 +410,15 @@ class HomeScreenViewModel(
                 spaceAccessType,
                 userPermissions
             ) { type, permission ->
+                val spaceId = spaceManager.get()
+                val spaceUxType =
+                    spaceViewSubscriptionContainer.get(space = SpaceId(spaceId))?.spaceUxType
+                        ?: SpaceUxType.DATA
                 NavPanelState.fromPermission(
                     permission = permission,
                     forceHome = false,
-                    spaceAccessType = type
+                    spaceAccess = type,
+                    spaceUxType = spaceUxType
                 )
             }.collect {
                 navPanelState.value = it
@@ -512,7 +519,9 @@ class HomeScreenViewModel(
                     when (widget) {
                         is Widget.Chat -> SpaceChatWidgetContainer(
                             widget = widget,
-                            container = chatPreviews
+                            container = chatPreviews,
+                            spaceViewSubscriptionContainer = spaceViewSubscriptionContainer,
+                            notificationPermissionManager = notificationPermissionManager
                         )
                         is Widget.Link -> LinkWidgetContainer(
                             widget = widget,
@@ -998,6 +1007,7 @@ class HomeScreenViewModel(
     }
 
     fun onWidgetMenuTriggered(widget: Id) {
+        Timber.d("onWidgetMenuTriggered: $widget")
         viewModelScope.launch {
             val isAutoCreated = widgets.value?.find { it.id == widget }?.isAutoCreated
             analytics.sendScreenWidgetMenuEvent(
@@ -1439,6 +1449,10 @@ class HomeScreenViewModel(
 
     fun onStart() {
         Timber.d("onStart")
+        viewModelScope.sendEvent(
+            analytics = analytics,
+            eventName = EventsDictionary.screenWidget
+        )
     }
 
     fun onResume(deeplink: DeepLinkResolver.Action? = null) {
@@ -1945,11 +1959,16 @@ class HomeScreenViewModel(
         }
     }
 
-    fun onBackClicked(isSpaceRoot: Boolean) {
-        proceedWithExiting(isSpaceRoot)
+    fun onBackClicked() {
+        proceedWithCloseOpenObjects()
+        viewModelScope.launch {
+            commands.emit(
+                Command.HandleChatSpaceBackNavigation
+            )
+        }
     }
 
-    private fun proceedWithExiting(isSpaceRoot: Boolean) {
+    private fun proceedWithCloseOpenObjects() {
         viewModelScope.launch {
             if (spaceManager.getState() is SpaceManager.State.Space) {
                 // Proceed with releasing resources before exiting
@@ -1968,12 +1987,7 @@ class HomeScreenViewModel(
                             Timber.e(it, "Error while closing object from history")
                         }
                 }
-                if (isSpaceRoot) {
-                    Timber.d("Root space screen. Releasing resources...")
-                    proceedWithClearingSpaceBeforeExitingToVault()
-                }
             }
-            commands.emit(Command.Exit)
         }
     }
 
@@ -2152,7 +2166,7 @@ class HomeScreenViewModel(
         view: ViewId?,
         navigate: Boolean = true
     ) {
-        Timber.d("onCreateDataViewObject")
+        Timber.d("onCreateDataViewObject, widget: $widget, view: $view, navigate: $navigate")
         viewModelScope.launch {
             val target = widgets.value.orEmpty().find { it.id == widget }
             if (target != null) {
@@ -2286,7 +2300,7 @@ class HomeScreenViewModel(
         dv: DV,
         navigate: Boolean = false
     ) {
-        Timber.d("proceedWithCreatingDataViewObject")
+        Timber.d("proceedWithCreatingDataViewObject, dataViewSourceObj: $dataViewSourceObj")
         val dataViewSourceType = dataViewSourceObj.uniqueKey
         val (_, defaultTemplate) = resolveTypeAndActiveViewTemplate(
             viewer,
@@ -2486,9 +2500,7 @@ class HomeScreenViewModel(
                     .onFailure { Timber.e(it, "Error while leaving space") }
                     .onSuccess {
                         // Forcing return to the vault even if space has chat.
-                        proceedWithExiting(
-                            isSpaceRoot = true
-                        )
+                        proceedWithCloseOpenObjects()
                     }
             } else {
                 Timber.e("Unexpected permission when trying to leave space: $permission")
@@ -2497,6 +2509,7 @@ class HomeScreenViewModel(
     }
 
     fun onCreateWidgetElementClicked(view: WidgetView) {
+        Timber.d("onCreateWidgetElementClicked, widget: $view")
         when(view) {
             is WidgetView.ListOfObjects -> {
                 if (view.type == WidgetView.ListOfObjects.Type.Favorites) {
@@ -2637,6 +2650,12 @@ class HomeScreenViewModel(
         }
     }
 
+    fun proceedWithExitingToVault() {
+        viewModelScope.launch {
+            proceedWithClearingSpaceBeforeExitingToVault()
+        }
+    }
+
     sealed class Navigation {
         data class OpenObject(val ctx: Id, val space: Id) : Navigation()
         data class OpenChat(val ctx: Id, val space: Id) : Navigation()
@@ -2688,7 +2707,6 @@ class HomeScreenViewModel(
         private val analytics: Analytics,
         private val getWidgetSession: GetWidgetSession,
         private val saveWidgetSession: SaveWidgetSession,
-        private val spaceGradientProvider: SpaceGradientProvider,
         private val storeOfObjectTypes: StoreOfObjectTypes,
         private val storeOfRelations: StoreOfRelations,
         private val objectWatcher: ObjectWatcher,
@@ -2719,7 +2737,8 @@ class HomeScreenViewModel(
         private val deleteSpace: DeleteSpace,
         private val activeSpaceMemberSubscriptionContainer: ActiveSpaceMemberSubscriptionContainer,
         private val setObjectListIsFavorite: SetObjectListIsFavorite,
-        private val chatPreviews: ChatPreviewContainer
+        private val chatPreviews: ChatPreviewContainer,
+        private val notificationPermissionManager: NotificationPermissionManager
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T = HomeScreenViewModel(
@@ -2766,7 +2785,6 @@ class HomeScreenViewModel(
             createBlock = createBlock,
             dateProvider = dateProvider,
             addObjectToCollection = addObjectToCollection,
-            clearLastOpenedSpace = clearLastOpenedSpace,
             clearLastOpenedObject = clearLastOpenedObject,
             spaceBinWidgetContainer = spaceBinWidgetContainer,
             featureToggles = featureToggles,
@@ -2778,7 +2796,8 @@ class HomeScreenViewModel(
             deleteSpace = this@Factory.deleteSpace,
             spaceMembers = activeSpaceMemberSubscriptionContainer,
             setAsFavourite = setObjectListIsFavorite,
-            chatPreviews = chatPreviews
+            chatPreviews = chatPreviews,
+            notificationPermissionManager = notificationPermissionManager
         ) as T
     }
 
@@ -2833,7 +2852,6 @@ sealed class Command {
     data class OpenGlobalSearchScreen(val space: Id) : Command()
 
     data object OpenVault: Command()
-    data object Exit: Command()
 
     data class SelectWidgetType(
         val ctx: Id,
@@ -2892,6 +2910,8 @@ sealed class Command {
     data class ShowInviteLinkQrCode(val link: String) : Command()
 
     data object ShowLeaveSpaceWarning : Command()
+
+    data object HandleChatSpaceBackNavigation : Command()
 }
 
 /**
@@ -2925,19 +2945,30 @@ sealed class OpenObjectNavigation {
 /**
  * @param [attachmentTarget] optional target, to which the object will be attached
  */
-fun ObjectWrapper.Basic.navigation(effect: OpenObjectNavigation.SideEffect = OpenObjectNavigation.SideEffect.None) : OpenObjectNavigation {
+fun ObjectWrapper.Basic.navigation(
+    effect: OpenObjectNavigation.SideEffect = OpenObjectNavigation.SideEffect.None,
+    openBookmarkAsObject: Boolean = false,
+) : OpenObjectNavigation {
     if (!isValid) return OpenObjectNavigation.NonValidObject
     return when (layout) {
         ObjectType.Layout.BOOKMARK -> {
-            val url = getValue<String>(Relations.SOURCE)
-            if (url.isNullOrEmpty()) {
+            if (openBookmarkAsObject) {
                 OpenObjectNavigation.OpenEditor(
                     target = id,
                     space = requireNotNull(spaceId),
                     effect = effect
                 )
             } else {
-                OpenObjectNavigation.OpenBookmarkUrl(url)
+                val url = getValue<String>(Relations.SOURCE)
+                if (url.isNullOrEmpty()) {
+                    OpenObjectNavigation.OpenEditor(
+                        target = id,
+                        space = requireNotNull(spaceId),
+                        effect = effect
+                    )
+                } else {
+                    OpenObjectNavigation.OpenBookmarkUrl(url)
+                }
             }
         }
         ObjectType.Layout.BASIC,

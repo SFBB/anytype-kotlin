@@ -250,6 +250,7 @@ fun Markup.Type.getPropName() = when (this) {
     Markup.Type.MENTION -> "Mention"
     Markup.Type.OBJECT -> "Object"
     Markup.Type.UNDERLINE -> "Underline"
+    Markup.Type.EMOJI -> "Emoji"
 }
 
 fun DVFilterCondition.getPropName() = when (this) {
@@ -757,16 +758,26 @@ suspend fun Analytics.sendAnalyticsDownloadMediaEvent(type: Block.Content.File.T
     registerEvent(event)
 }
 
-suspend fun Analytics.sendAnalyticsUndoEvent() {
+suspend fun Analytics.sendAnalyticsUndoEvent(type: Boolean) {
     val event = EventAnalytics.Anytype(
-        name = EventsDictionary.objectUndo
+        name = EventsDictionary.objectUndo,
+        props = Props(
+            mapOf(
+                EventsPropertiesKey.type to type
+            )
+        )
     )
     registerEvent(event)
 }
 
-suspend fun Analytics.sendAnalyticsRedoEvent() {
+suspend fun Analytics.sendAnalyticsRedoEvent(type: Boolean) {
     val event = EventAnalytics.Anytype(
-        name = EventsDictionary.objectRedo
+        name = EventsDictionary.objectRedo,
+        props = Props(
+            mapOf(
+                EventsPropertiesKey.type to type
+            )
+        )
     )
     registerEvent(event)
 }
@@ -2017,17 +2028,10 @@ suspend fun Analytics.sendSettingsStorageOffloadEvent() {
 }
 
 suspend fun Analytics.proceedWithAccountEvent(
-    configStorage: ConfigStorage,
     startTime: Long,
     eventName: String,
-    lang: String? = null
+    analyticsId: Id
 ) {
-    val analyticsId = configStorage.get().analytics
-    val userProperty = UserProperty.AccountId(analyticsId)
-    updateUserProperty(userProperty)
-    if (lang != null) {
-        updateUserProperty(UserProperty.InterfaceLanguage(lang))
-    }
     sendEvent(
         startTime = startTime,
         middleTime = System.currentTimeMillis(),
