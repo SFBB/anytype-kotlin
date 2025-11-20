@@ -6,6 +6,7 @@ import com.anytypeio.anytype.core_models.Id
 import com.anytypeio.anytype.core_models.LinkPreview
 import com.anytypeio.anytype.core_models.ObjectType
 import com.anytypeio.anytype.core_models.ObjectWrapper
+import com.anytypeio.anytype.core_models.SupportedLayouts
 import com.anytypeio.anytype.core_models.Url
 import com.anytypeio.anytype.domain.chats.ChatContainer
 import com.anytypeio.anytype.presentation.confgs.ChatConfig
@@ -125,6 +126,7 @@ sealed interface ChatView {
                 val status: SyncStatus = SyncStatus.Unknown
             ): Attachment() {
                 val isSyncing: Boolean = status is SyncStatus.Syncing
+                val isSynced: Boolean = status is SyncStatus.Synced
             }
 
             data class Link(
@@ -138,10 +140,22 @@ sealed interface ChatView {
                 private val resolvedTitle: String
                     get() {
                     val layout = wrapper?.layout
-                    return if (layout == ObjectType.Layout.NOTE) {
-                        wrapper.snippet.orEmpty()
-                    } else {
-                        wrapper?.name.orEmpty()
+                    return when {
+                        layout == ObjectType.Layout.NOTE -> {
+                            wrapper.snippet.orEmpty()
+                        }
+                        layout in SupportedLayouts.fileLayouts -> {
+                            val fileName = wrapper?.name.orEmpty()
+                            val fileExt = wrapper?.fileExt
+                            when {
+                                fileExt.isNullOrBlank() -> fileName
+                                fileName.endsWith(".${fileExt}") -> fileName
+                                else -> "$fileName.$fileExt"
+                            }
+                        }
+                        else -> {
+                            wrapper?.name.orEmpty()
+                        }
                     }
                 }
 
