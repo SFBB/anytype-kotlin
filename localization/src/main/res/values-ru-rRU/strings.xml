@@ -1658,7 +1658,7 @@
     <string name="version_history_error_get_version">Ошибка получения истории версий</string>
     <string name="version_history_error_get_members">Ошибка при получении участников</string>
     <string name="new_object">Новый объект</string>
-    <string name="vault_my_spaces">Мои пространства</string>
+    <string name="vault_my_spaces">My Channels</string>
     <string name="vault_unread_section_title">Непрочитанные</string>
     <string name="vault_all_section_title">Все</string>
     <string name="vault_pinned_section_title">Закреплённые</string>

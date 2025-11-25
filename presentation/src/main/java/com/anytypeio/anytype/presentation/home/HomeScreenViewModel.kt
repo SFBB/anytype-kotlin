@@ -1283,6 +1283,42 @@ class HomeScreenViewModel(
         }
     }
 
+    fun onSeeAllClicked(widgetId: Id, viewId: ViewId?) {
+        Timber.d("onSeeAllClicked: widgetId=$widgetId, viewId=$viewId")
+        val widget = currentWidgets?.find { it.id == widgetId } ?: return
+        val source = widget.source
+        
+        if (source is Widget.Source.Default) {
+            if (source.obj.isArchived != true) {
+                dispatchSelectHomeTabCustomSourceEvent(
+                    widget = widgetId,
+                    source = source
+                )
+                // Check if it's a Set or Collection layout and we have a viewId
+                val layout = source.obj.layout
+                if ((layout == ObjectType.Layout.SET || layout == ObjectType.Layout.COLLECTION) && viewId != null) {
+                    viewModelScope.launch {
+                        navigate(
+                            Navigation.OpenSet(
+                                ctx = source.obj.id,
+                                space = vmParams.spaceId.id,
+                                view = viewId
+                            )
+                        )
+                    }
+                } else {
+                    // Fall back to standard navigation without view
+                    proceedWithOpeningObject(source.obj)
+                }
+            } else {
+                sendToast("Open bin to restore your archived object")
+            }
+        } else {
+            // For non-default sources, delegate to standard handler
+            onWidgetSourceClicked(widgetId)
+        }
+    }
+
     fun onBinWidgetClicked() {
         viewModelScope.launch {
             navigation(
@@ -2921,6 +2957,16 @@ class HomeScreenViewModel(
             viewModelScope.launch {
                 Timber.d("DROID-3965, Persisting type widget order: ${newOrder.map { it.takeLast(4) + "..." }}")
 
+                // Store the current order for potential rollback
+                val previousOrder = typeWidgets.value.toList()
+
+                // Optimistically update typeWidgets immediately to keep UI in sync
+                val reorderedWidgets = newOrder.mapNotNull { id ->
+                    typeWidgets.value.find { it.id == id }
+                }
+                typeWidgets.value = reorderedWidgets
+                Timber.d("DROID-4113, Optimistically updated typeWidgets to new order")
+
                 // Activate event lock before sending to middleware to prevent race conditions
                 activateTypeWidgetEventLock()
 
@@ -2932,6 +2978,9 @@ class HomeScreenViewModel(
                 ).fold(
                     onFailure = { error ->
                         Timber.e(error, "DROID-3965, Failed to reorder type widgets: $newOrder")
+                        // Rollback to previous order
+                        typeWidgets.value = previousOrder
+                        Timber.d("DROID-4113, Rolled back typeWidgets to previous order")
                         clearTypeWidgetDragState()
                     },
                     onSuccess = { finalOrder ->
