@@ -98,9 +98,25 @@ class NotificationBuilderImpl(
             Timber.w("Failed to load both chat and space icons for notification. spaceId=$spaceId, chatId=${message.chatId}")
         }
 
+        // Determine notification title:
+        // - For Data spaces: use "Space name - Chat name" format
+        // - For Chat spaces: use the space name (space and chat are the same)
+        val notificationTitle = if (spaceView?.spaceUxType == SpaceUxType.DATA) {
+            val chatName = chatsDetailsSubscriptionContainer.get(message.chatId)?.name
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+            if (chatName != null) {
+                "${message.spaceName.trim()} - $chatName"
+            } else {
+                message.spaceName.trim()  // Fallback to space name only if chat name unavailable
+            }
+        } else {
+            message.spaceName.trim()
+        }
+
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_app_notification)
-            .setContentTitle(message.spaceName.trim())
+            .setContentTitle(notificationTitle)
             .setContentText(singleLine)
             .setStyle(NotificationCompat.BigTextStyle().bigText(singleLine))
             .setAutoCancel(true)
@@ -128,7 +144,7 @@ class NotificationBuilderImpl(
         // Create or update summary notification for the group
         updateSummaryNotification(
             groupId = groupId,
-            spaceName = message.spaceName,
+            spaceName = notificationTitle,
             chatPendingIntent = pending,
             largeIcon = largeIcon
         )
