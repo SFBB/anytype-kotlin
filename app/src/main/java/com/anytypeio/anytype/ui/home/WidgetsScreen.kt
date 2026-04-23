@@ -2,7 +2,6 @@ package com.anytypeio.anytype.ui.home
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
@@ -41,8 +39,8 @@ import com.anytypeio.anytype.presentation.navigation.NavPanelState
 import com.anytypeio.anytype.presentation.widgets.DropDownMenuAction
 import com.anytypeio.anytype.presentation.widgets.SectionType
 import com.anytypeio.anytype.presentation.widgets.Widget.Source.Companion.OBJECT_TYPES_GROUP_ID
+import com.anytypeio.anytype.presentation.widgets.Widget.Source.Companion.SECTION_MY_FAVORITES
 import com.anytypeio.anytype.presentation.widgets.Widget.Source.Companion.SECTION_OBJECT_TYPE
-import com.anytypeio.anytype.presentation.widgets.Widget.Source.Companion.SECTION_PINNED
 import com.anytypeio.anytype.presentation.widgets.Widget.Source.Companion.SECTION_RECENTLY_EDITED
 import com.anytypeio.anytype.presentation.widgets.Widget.Source.Companion.SECTION_UNREAD
 import com.anytypeio.anytype.presentation.widgets.Widget.Source.Companion.WIDGET_BIN_ID
@@ -51,7 +49,7 @@ import com.anytypeio.anytype.presentation.widgets.WidgetView
 import com.anytypeio.anytype.presentation.widgets.extractWidgetId
 import com.anytypeio.anytype.ui.widgets.types.AddWidgetButton
 import com.anytypeio.anytype.ui.widgets.types.BinWidgetCard
-import com.anytypeio.anytype.ui.widgets.types.CreateHomeWidgetCard
+import com.anytypeio.anytype.ui.widgets.types.HomeWidgetCard
 import com.anytypeio.anytype.ui.widgets.types.InviteMembersWidgetCard
 import com.anytypeio.anytype.ui.widgets.types.ObjectTypesGroupWidgetCard
 import com.anytypeio.anytype.ui.widgets.types.SpaceChatWidgetCard
@@ -72,11 +70,14 @@ fun WidgetsScreen(
     val pinnedWidgets = viewModel.pinnedViews.collectAsState().value
     val typeWidgets = viewModel.typeViews.collectAsState().value
     val unreadWidget = viewModel.unreadView.collectAsState().value
+    val personalFavoritesWidget = viewModel.personalFavoritesView.collectAsState().value
+    val canToggleChannelPin = viewModel.canToggleChannelPin.collectAsState().value
+    val favoriteTargets = viewModel.favoriteTargets.collectAsState().value
+    val myFavoritesReorderFailedSignal = viewModel.myFavoritesReorderFailedCount.collectAsState().value
     val chatWidget = viewModel.chatView.collectAsState().value
     val binWidget = viewModel.binView.collectAsState().value
     val recentlyEditedWidget = viewModel.recentlyEditedView.collectAsState().value
-    val showHomepagePicker = viewModel.showHomepagePicker.collectAsState().value // used for guard
-    val showCreateHomeWidget = viewModel.showCreateHomeWidget.collectAsState().value
+    val homeWidget = viewModel.homeWidgetView.collectAsState().value
     val showInviteMembersWidget = viewModel.showInviteMembersWidget.collectAsState().value
     val collapsedSections = viewModel.collapsedSections.collectAsState().value
     val sectionConfig = viewModel.widgetSections.collectAsState().value
@@ -139,8 +140,15 @@ fun WidgetsScreen(
     }
     
     // Show header if: has items OR is collapsed OR was previously shown
-    val shouldShowUnreadSection = unreadWidgetView != null && 
+    val shouldShowUnreadSection = unreadWidgetView != null &&
         (unreadWidgetView.elements.isNotEmpty() || isUnreadSectionCollapsed || hadUnreadItems.value)
+
+    // My Favorites section visibility: purely data-driven — shown iff the
+    // user has at least one personal favorite in this space. No user-toggle
+    // collapse (see SectionSettings.isUserConfigurable).
+    val personalFavoritesWidgetView = personalFavoritesWidget as? WidgetView.SetOfObjects
+    val shouldShowPersonalFavoritesSection =
+        personalFavoritesWidgetView != null && personalFavoritesWidgetView.elements.isNotEmpty()
 
     // Recently Edited section visibility logic
     val recentlyEditedView = recentlyEditedWidget as? WidgetView.RecentlyEdited
@@ -177,35 +185,9 @@ fun WidgetsScreen(
     val hideCountersInOtherSections = !isUnreadSectionCollapsed
             && unreadWidgetView?.elements?.isNotEmpty() == true
 
-    // Determine if sections should be visible
-    val isPinnedSectionCollapsed = collapsedSections.contains(SECTION_PINNED)
+    // DROID-4397: Pinned has no section header and no collapse behavior. The
+    // block is simply hidden when there are no pins, shown otherwise.
     val isObjectsSectionCollapsed = collapsedSections.contains(SECTION_OBJECT_TYPE)
-
-    // Track previous collapse state to detect expand transitions
-    val wasCollapsed = remember { mutableStateOf(isPinnedSectionCollapsed) }
-    val hadPinnedItems = remember { mutableStateOf(pinnedUi.isNotEmpty()) }
-
-    // When section becomes expanded (transition from collapsed to expanded)
-    // Keep the flag true to prevent flicker until items load
-    if (!isPinnedSectionCollapsed && wasCollapsed.value) {
-        hadPinnedItems.value = true
-    }
-
-    // Update previous state for next composition
-    wasCollapsed.value = isPinnedSectionCollapsed
-
-    // Set flag when items are present
-    if (pinnedUi.isNotEmpty()) {
-        hadPinnedItems.value = true
-    }
-
-    // Reset flag when section is collapsed and has no items
-    if (isPinnedSectionCollapsed && pinnedUi.isEmpty()) {
-        hadPinnedItems.value = false
-    }
-
-    // Show header if: has items OR is collapsed OR was previously shown (prevents flicker on expand)
-    val shouldShowPinnedHeader = pinnedUi.isNotEmpty() || isPinnedSectionCollapsed || hadPinnedItems.value
 
     val isDraggingPinned = remember { mutableStateOf(false) }
     val isDraggingTypes = remember { mutableStateOf(false) }
@@ -304,17 +286,18 @@ fun WidgetsScreen(
                 }
             }
 
-            // "Create Home" widget — shown when homepage is not set and picker was dismissed
-            // Stays visible at 50% opacity while homepage picker is open
-            if (showCreateHomeWidget) {
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-                item(key = WidgetView.CreateHome.WIDGET_CREATE_HOME_ID) {
-                    CreateHomeWidgetCard(
-                        onWidgetClicked = viewModel::onCreateHomeWidgetClicked,
-                        onDismissClicked = viewModel::onCreateHomeWidgetDismissed,
-                        modifier = Modifier.alpha(if (showHomepagePicker) 0.5f else 1f)
+            // "Home" widget — shortcut back to the space homepage (Chat / Page / Collection).
+            // Hidden when homepage is widgets. Non-reorderable.
+            // DROID-4463: hidden entirely in 1-on-1 channels (Chat is always home);
+            // long-press Change Home menu gated to owners of regular channels.
+            val spaceViewSuccess = spaceView as? HomeScreenViewModel.SpaceViewState.Success
+            if (homeWidget != null && spaceViewSuccess?.isOneToOneSpace != true) {
+                item(key = WidgetView.Home.WIDGET_HOME_ID) {
+                    HomeWidgetCard(
+                        item = homeWidget,
+                        onWidgetClicked = viewModel::onHomeWidgetClicked,
+                        onChangeHomeClicked = viewModel::onHomeWidgetChangeHomeClicked,
+                        canChangeHome = spaceViewSuccess?.canChangeHome == true
                     )
                 }
             }
@@ -370,42 +353,34 @@ fun WidgetsScreen(
                     }
 
                     WidgetSectionType.PINNED -> {
-                        // Pinned section header
-                        if (shouldShowPinnedHeader) {
-                            item {
-                                ReorderableItem(
-                                    enabled = false,
-                                    state = reorderableState,
-                                    key = SECTION_PINNED,
-                                ) {
-                                    PinnedSectionHeader(
-                                        onSectionClicked = viewModel::onSectionPinnedClicked
-                                    )
-                                }
-                            }
+                        // DROID-4397: Pinned block — no section header, no collapse.
+                        // Hidden entirely when there are no pins. Rendered directly
+                        // under the Home widget (position 0 in DEFAULT_ORDER).
+                        if (pinnedUi.isNotEmpty()) {
+                            renderWidgetSection(
+                                widgets = pinnedUi,
+                                reorderableState = reorderableState,
+                                view = view,
+                                mode = mode,
+                                sectionType = SectionType.PINNED,
+                                isOtherSectionDragging = isDraggingTypes.value,
+                                hideCounters = hideCountersInOtherSections,
+                                canToggleChannelPin = canToggleChannelPin,
+                                favoriteTargets = favoriteTargets,
+                                onExpand = viewModel::onExpand,
+                                onWidgetMenuAction = { widget: Id, action: DropDownMenuAction ->
+                                    viewModel.onDropDownMenuAction(widget, action)
+                                },
+                                onWidgetElementClicked = viewModel::onWidgetElementClicked,
+                                onWidgetSourceClicked = viewModel::onWidgetSourceClicked,
+                                onSeeAllClicked = viewModel::onSeeAllClicked,
+                                onToggleExpandedWidgetState = viewModel::onToggleWidgetExpandedState,
+                                onChangeWidgetView = viewModel::onChangeCurrentWidgetView,
+                                onObjectCheckboxClicked = viewModel::onObjectCheckboxClicked,
+                                onCreateElement = viewModel::onCreateWidgetElementClicked,
+                                onCreateWidget = viewModel::onCreateWidgetClicked
+                            )
                         }
-                        // Pinned widgets (hidden when section is collapsed)
-                        if (!isPinnedSectionCollapsed) renderWidgetSection(
-                            widgets = pinnedUi,
-                            reorderableState = reorderableState,
-                            view = view,
-                            mode = mode,
-                            sectionType = SectionType.PINNED,
-                            isOtherSectionDragging = isDraggingTypes.value,
-                            hideCounters = hideCountersInOtherSections,
-                            onExpand = viewModel::onExpand,
-                            onWidgetMenuAction = { widget: Id, action: DropDownMenuAction ->
-                                viewModel.onDropDownMenuAction(widget, action)
-                            },
-                            onWidgetElementClicked = viewModel::onWidgetElementClicked,
-                            onWidgetSourceClicked = viewModel::onWidgetSourceClicked,
-                            onSeeAllClicked = viewModel::onSeeAllClicked,
-                            onToggleExpandedWidgetState = viewModel::onToggleWidgetExpandedState,
-                            onChangeWidgetView = viewModel::onChangeCurrentWidgetView,
-                            onObjectCheckboxClicked = viewModel::onObjectCheckboxClicked,
-                            onCreateElement = viewModel::onCreateWidgetElementClicked,
-                            onCreateWidget = viewModel::onCreateWidgetClicked
-                        )
                     }
 
                     WidgetSectionType.OBJECTS -> {
@@ -505,6 +480,42 @@ fun WidgetsScreen(
                                             }
                                         )
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    WidgetSectionType.MY_FAVORITES -> {
+                        if (shouldShowPersonalFavoritesSection && personalFavoritesWidgetView != null) {
+                            item(key = SECTION_MY_FAVORITES) {
+                                ReorderableItem(
+                                    enabled = false,
+                                    state = reorderableState,
+                                    key = SECTION_MY_FAVORITES,
+                                ) {
+                                    MyFavoritesSectionHeader(
+                                        onSectionClicked = {} // Not user-collapsible per spec
+                                    )
+                                }
+                            }
+                            item(key = "my_favorites_widget_content") {
+                                ReorderableItem(
+                                    enabled = false,
+                                    state = reorderableState,
+                                    key = "my_favorites_widget_content",
+                                ) {
+                                    MyFavoritesWidget(
+                                        item = personalFavoritesWidgetView,
+                                        mode = mode,
+                                        onWidgetObjectClicked = { obj ->
+                                            viewModel.onWidgetElementClicked(
+                                                personalFavoritesWidgetView.id, obj
+                                            )
+                                        },
+                                        onObjectCheckboxClicked = viewModel::onObjectCheckboxClicked,
+                                        onReordered = viewModel::onMyFavoritesReordered,
+                                        reorderFailedSignal = myFavoritesReorderFailedSignal
+                                    )
                                 }
                             }
                         }
