@@ -494,7 +494,8 @@ interface BlockRepository {
     suspend fun generateSpaceInviteLink(
         space: SpaceId,
         inviteType: InviteType?,
-        permissions: SpaceMemberPermissions?
+        permissions: SpaceMemberPermissions?,
+        shareWithinSpace: Boolean = false
     ): SpaceInviteLink
     suspend fun revokeSpaceInviteLink(space: SpaceId)
     suspend fun approveSpaceRequest(
@@ -576,7 +577,7 @@ interface BlockRepository {
 
     suspend fun objectDateByTimestamp(command: Command.ObjectDateByTimestamp): Struct?
 
-    suspend fun setDeviceNetworkState(type: DeviceNetworkType)
+    suspend fun setDeviceNetworkState(type: DeviceNetworkType, networkId: String)
 
     suspend fun setAppState(state: AppState)
 

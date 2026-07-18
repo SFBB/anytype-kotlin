@@ -1001,12 +1001,14 @@ class BlockDataRepository(
     override suspend fun generateSpaceInviteLink(
         space: SpaceId,
         inviteType: InviteType?,
-        permissions: SpaceMemberPermissions?
+        permissions: SpaceMemberPermissions?,
+        shareWithinSpace: Boolean
     ): SpaceInviteLink {
         return remote.generateSpaceInviteLink(
             space = space,
             inviteType = inviteType,
-            permissions = permissions
+            permissions = permissions,
+            shareWithinSpace = shareWithinSpace
         )
     }
 
@@ -1254,8 +1256,8 @@ class BlockDataRepository(
         return remote.objectDateByTimestamp(command)
     }
 
-    override suspend fun setDeviceNetworkState(type: DeviceNetworkType) {
-        remote.setDeviceNetworkState(type)
+    override suspend fun setDeviceNetworkState(type: DeviceNetworkType, networkId: String) {
+        remote.setDeviceNetworkState(type, networkId)
     }
 
     override suspend fun setAppState(state: AppState) {

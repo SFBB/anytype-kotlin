@@ -966,12 +966,14 @@ class BlockMiddleware(
     override suspend fun generateSpaceInviteLink(
         space: SpaceId,
         inviteType: InviteType?,
-        permissions: SpaceMemberPermissions?
+        permissions: SpaceMemberPermissions?,
+        shareWithinSpace: Boolean
     ): SpaceInviteLink {
         return middleware.generateSpaceInviteLink(
             space = space,
             inviteType = inviteType,
-            permissions = permissions
+            permissions = permissions,
+            shareWithinSpace = shareWithinSpace
         )
     }
 
@@ -1231,8 +1233,8 @@ class BlockMiddleware(
         return middleware.objectDateByTimestamp(command)
     }
 
-    override suspend fun setDeviceNetworkState(type: DeviceNetworkType) {
-        middleware.setDeviceNetworkState(type)
+    override suspend fun setDeviceNetworkState(type: DeviceNetworkType, networkId: String) {
+        middleware.setDeviceNetworkState(type, networkId)
     }
 
     override suspend fun setAppState(state: AppState) {
