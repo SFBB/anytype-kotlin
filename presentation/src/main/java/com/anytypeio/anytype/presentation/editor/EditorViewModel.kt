@@ -406,6 +406,29 @@ class EditorViewModel(
 
     val views: List<BlockView> get() = orchestrator.stores.views.current()
 
+    /**
+     * Old id -> new id for blocks whose identity changed under the caret: trailing
+     * placeholder materialization ([lastMaterializedTrailingBlock]) and the empty-block
+     * identity fork ([lastForkedBlock]).
+     *
+     * Read by the view layer so DiffUtil treats such a swap as a change of the same row
+     * rather than remove + insert. Removing the focused row detaches its View, which
+     * clears focus and terminates any in-progress IME composition — that is what split
+     * the first Hangul syllable into bare jamo (DROID-4557).
+     *
+     * These fields outlive the swap render (they are also used to redirect events that
+     * still target the pre-swap id), so consumers must ignore an entry whose key is still
+     * present in the new list — VIRTUAL_TRAILING_BLOCK_ID in particular is reused across
+     * placeholder sessions.
+     *
+     * Written on the main thread; read there too (see EditorFragment's diff loop).
+     */
+    val blockIdAliases: Map<Id, Id>
+        get() = buildMap {
+            lastMaterializedTrailingBlock?.let { put(VIRTUAL_TRAILING_BLOCK_ID, it) }
+            lastForkedBlock?.let { (old, new) -> put(old, new) }
+        }
+
     val restore: Queue<Restore> = LinkedList()
 
     private val jobs = mutableListOf<Job>()
@@ -9029,7 +9052,9 @@ class EditorViewModel(
                         target = context,
                         relationKey = relation.key,
                         isReadOnlyValue = isReadOnlyValue(restrictions),
-                        space = requireNotNull(relation.spaceId)
+                        // See the TagOrStatus branch below: the edited object's space, not the
+                        // relation object's (DROID-4554).
+                        space = vmParams.space.id
                     )
                 )
             }
@@ -9064,7 +9089,11 @@ class EditorViewModel(
                         target = context,
                         relationKey = relation.key,
                         isReadOnlyValue = isReadOnlyValue(restrictions),
-                        space = requireNotNull(relation.spaceId)
+                        // The edited object's space, not the relation object's. The value
+                        // screen scopes its search by this twice (RPC + spaceId filter), so
+                        // any drift silently returns zero candidates (DROID-4554). Matches
+                        // ObjectFieldsFragment and ObjectSetFragment, which pass their own space.
+                        space = vmParams.space.id
                     )
                 )
             }
@@ -9075,7 +9104,9 @@ class EditorViewModel(
                         target = context,
                         relationKey = relation.key,
                         isReadOnlyValue = isReadOnlyValue(restrictions),
-                        space = requireNotNull(relation.spaceId)
+                        // See the TagOrStatus branch above: the edited object's space, so the
+                        // candidate search is scoped where the objects actually live.
+                        space = vmParams.space.id
                     )
                 )
             }
