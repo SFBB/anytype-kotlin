@@ -121,6 +121,17 @@ class DefaultUserSettingsCache(
             .apply()
     }
 
+    override suspend fun setLastBackgroundedAt(timeInSeconds: Long) {
+        prefs.edit()
+            .putLong(LAST_BACKGROUNDED_AT_KEY, timeInSeconds)
+            .apply()
+    }
+
+    override suspend fun getLastBackgroundedAt(): Long? {
+        val value = prefs.getLong(LAST_BACKGROUNDED_AT_KEY, NO_TIMESTAMP)
+        return if (value == NO_TIMESTAMP) null else value
+    }
+
     override suspend fun setDefaultObjectType(space: SpaceId, type: TypeId) {
         val curr = prefs
             .getString(DEFAULT_OBJECT_TYPES_KEY, NO_VALUE)
@@ -838,6 +849,34 @@ class DefaultUserSettingsCache(
             .toMap()
     }
 
+    override suspend fun getVaultSortKeys(): Map<Id, Long> {
+        val spacePreferences = context.spacePrefsStore.data.first()
+        return spacePreferences.preferences
+            .mapNotNull { (spaceId, spacePref) ->
+                val date = spacePref.vaultLastMessageDate
+                if (date != null && date > 0) spaceId to date else null
+            }
+            .toMap()
+    }
+
+    override suspend fun setVaultSortKeys(keys: Map<Id, Long>) {
+        if (keys.isEmpty()) return
+        context.spacePrefsStore.updateData { existingPreferences ->
+            val result = buildMap {
+                putAll(existingPreferences.preferences)
+                keys.forEach { (spaceId, date) ->
+                    val given = existingPreferences
+                        .preferences
+                        .getOrDefault(key = spaceId, defaultValue = SpacePreference())
+                    put(key = spaceId, given.copy(vaultLastMessageDate = date))
+                }
+            }
+            // copy(), not the constructor: preserves top-level unknown fields written
+            // by a newer build, matching how the rest of this file mutates the store.
+            existingPreferences.copy(preferences = result)
+        }
+    }
+
     override suspend fun getQuickCaptureEnabled(): Boolean {
         return prefs.getBoolean(QUICK_CAPTURE_ENABLED_KEY, true)
     }
@@ -1084,6 +1123,8 @@ class DefaultUserSettingsCache(
 
     companion object {
         const val CURRENT_SPACE_KEY = "prefs.user_settings.current_space"
+        const val LAST_BACKGROUNDED_AT_KEY = "prefs.user_settings.last_backgrounded_at"
+        private const val NO_TIMESTAMP = -1L
         const val DEFAULT_OBJECT_TYPE_ID_KEY = "prefs.user_settings.default_object_type.id"
         const val DEFAULT_OBJECT_TYPE_NAME_KEY = "prefs.user_settings.default_object_type.name"
 

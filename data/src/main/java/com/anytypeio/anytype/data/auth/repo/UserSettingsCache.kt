@@ -22,6 +22,9 @@ interface UserSettingsCache {
     suspend fun getCurrentSpace(): SpaceId?
     suspend fun clearCurrentSpace()
 
+    suspend fun setLastBackgroundedAt(timeInSeconds: Long)
+    suspend fun getLastBackgroundedAt(): Long?
+
     suspend fun setDefaultObjectType(space: SpaceId, type: TypeId)
     suspend fun getDefaultObjectType(space: SpaceId): TypeId?
     suspend fun setPinnedObjectTypes(space: SpaceId, types: List<TypeId>)
@@ -109,6 +112,9 @@ interface UserSettingsCache {
 
     suspend fun setSpaceLastInteraction(space: SpaceId, timestamp: Long)
     suspend fun getSpaceLastInteractions(): Map<Id, Long>
+
+    suspend fun getVaultSortKeys(): Map<Id, Long>
+    suspend fun setVaultSortKeys(keys: Map<Id, Long>)
 
     suspend fun setQuickCaptureLastSpace(space: Id)
     suspend fun getQuickCaptureLastSpace(): Id?

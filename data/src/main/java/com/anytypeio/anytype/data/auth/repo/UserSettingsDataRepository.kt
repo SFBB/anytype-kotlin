@@ -73,6 +73,11 @@ class UserSettingsDataRepository(private val cache: UserSettingsCache) : UserSet
 
     override suspend fun clearCurrentSpace() = cache.clearCurrentSpace()
 
+    override suspend fun setLastBackgroundedAt(timeInSeconds: Long) =
+        cache.setLastBackgroundedAt(timeInSeconds)
+
+    override suspend fun getLastBackgroundedAt(): Long? = cache.getLastBackgroundedAt()
+
     override suspend fun setLastOpenedObject(id: Id, space: SpaceId) {
         cache.setLastOpenedObject(id, space)
     }
@@ -304,6 +309,14 @@ class UserSettingsDataRepository(private val cache: UserSettingsCache) : UserSet
 
     override suspend fun getSpaceLastInteractions(): Map<Id, Long> {
         return cache.getSpaceLastInteractions()
+    }
+
+    override suspend fun getVaultSortKeys(): Map<Id, Long> {
+        return cache.getVaultSortKeys()
+    }
+
+    override suspend fun setVaultSortKeys(keys: Map<Id, Long>) {
+        cache.setVaultSortKeys(keys)
     }
 
     override suspend fun setQuickCaptureLastSpace(space: Id) {
